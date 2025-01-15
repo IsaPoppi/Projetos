@@ -1,0 +1,380 @@
+-Aprender a **coletar dados** do YouTube utilizando R.
+-   Realizar **análises exploratórias** e **visualizações impactantes** dos dados coletados.
+-   Entender como **analisar texto** e **sentimento** com os dados disponíveis.
+-   Conhecer as possibilidades adicionais que a autenticação via **OAuth 2.0** nos oferece.
+-   Preparar um **exercício** para a próxima aula, envolvendo autenticação e coleta avançada de dados.
+
+------------------------------------------------------------------------
+
+## **Preparação do Ambiente**
+
+### **Carregando os Pacotes Necessários**
+
+Vamos utilizar os seguintes pacotes:
+
+-   `tuber`: Para interagir com a API do YouTube.
+-   `tidyverse`: Conjunto de pacotes para manipulação e visualização de dados.
+-   `tidytext`: Para processamento de linguagem natural.
+-   `wordcloud2`: Para criar visualizações impactantes das palavras mais frequentes.
+
+```{r setup-packages, message=FALSE, warning=FALSE}
+knitr::opts_chunk$set(
+	echo = TRUE,
+	message = FALSE,
+	warning = FALSE
+)
+# Carregar o pacote pacman para gerenciar as bibliotecas
+if (!require("pacman")) install.packages("pacman")
+library(pacman)
+
+# Instalar e carregar os pacotes necessários
+pacman::p_load(
+  tuber,        # Interagir com a API do YouTube
+  tidyverse,    # Manipulação e visualização de dados
+  tidytext,     # Processamento de texto
+  wordcloud2,   # Visualização de nuvens de palavras
+  lubridate,    # Manipulação de datas
+  stopwords     # Stop words em português
+)
+
+```
+
+------------------------------------------------------------------------
+
+## **Coletando Dados do YouTube**
+
+Vamos iniciar coletando dados públicos do YouTube, sem a necessidade de autenticação.
+
+### **1. Pesquisando Vídeos sobre "Educação Online"**
+
+`#Carregar o pacote tuber library(tuber)`
+
+`#Inserir suas credenciais client_id <- "SUA CHAVE DA API"`
+
+`client_secret <- "SEU CLIENT SECRET"`
+
+`#Autenticar-se #Autenticar-se yt_oauth(app_id = client_id, app_secret = client_secret, token = '')`
+
+OS: OCULTAMENTE ESTOU RODANDO ESTE CÓDIGO COM MINHAS CREDENCIAIS
+
+```{r message=FALSE, warning=FALSE, include=FALSE, paged.print=FALSE}
+# Carregar o pacote tuber
+library(tuber)
+
+# Inserir suas credenciais
+client_id <- "CHAVE"
+client_secret <- "SECRET"
+
+# Autenticar-se
+# Autenticar-se
+yt_oauth(app_id = client_id, app_secret = client_secret, token = '')
+```
+
+#### **Minhas conexões com a API do YouTube se esgotaram, e eu estava recebendo um erro 403 como resultado.**
+
+Vamos criar uma para vocês hoje, mas, por ora, sigamos.
+
+```{r video-search, eval=FALSE, message=FALSE, warning=FALSE, include=FALSE}
+# Instalar e carregar o pacote kableExtra (se necessário)
+if (!require("kableExtra")) install.packages("kableExtra")
+library(kableExtra)
+
+# Pesquisar vídeos sobre "Educação Online"
+videos <- yt_search("Educação Online", max_results = 20)
+
+# Visualizar as primeiras linhas com kableExtra
+head(videos) %>%
+  kbl(caption = "Lista de Vídeos sobre Educação Online") %>%
+  kable_styling(full_width = FALSE, bootstrap_options = c("striped", "hover", "condensed"))
+saveRDS(videos, "videos.rds")
+```
+
+`{r video-search, message=FALSE, warning=FALSE} # Instalar e carregar o pacote kableExtra (se necessário) if (!require("kableExtra")) install.packages("kableExtra") library(kableExtra)`
+
+`#Pesquisar vídeos sobre "Educação Online"`
+
+`videos <- yt_search("Educação Online", max_results = 20)`
+
+`#Visualizar as primeiras linhas com kableExtra`
+
+`head(videos) %>% kbl(caption = "Lista de Vídeos sobre Educação Online") %>% kable_styling(full_width = FALSE, bootstrap_options = c("striped", "hover", "condensed")) saveRDS(videos, "videos.rds")`
+
+**Explicação:**
+
+-   A função `yt_search()` nos permite buscar vídeos no YouTube com base em um termo de pesquisa.
+
+-   `max_results = 50` limita a busca aos 50 primeiros resultados.
+
+-   Os resultados incluem informações como **título**, **descrição**, **canal** e **data de publicação**.
+
+-   Utilizamos a função `yt_oauth()` para autenticar-se no YouTube.
+
+-   `kableExtra` é um pacote que nos permite criar tabelas interativas com o `kable`
+
+------------------------------------------------------------------------
+
+### **2. Explorando os Dados Coletados**
+
+Após realizar a pesquisa no YouTube sobre "educação online", obtivemos uma lista de vídeos com informações básicas.
+Vamos explorar esses dados e extrair insights valiosos a partir das informações disponíveis.
+
+#### **2.1. Selecionando as Colunas Relevantes**
+
+Começaremos selecionando as colunas que são relevantes para nossa análise, que incluem:
+
+-   **`video_id`**: Identificador único do vídeo no YouTube.
+-   **`title`**: Título do vídeo.
+-   **`description`**: Descrição do vídeo.
+-   **`publishedAt`**: Data e hora em que o vídeo foi publicado.
+-   **`channelTitle`**: Nome do canal que publicou o vídeo.
+-   **`channelId`**: Identificador único do canal.
+
+```{r select-columns}
+# Selecionar colunas importantes
+videos <- readRDS("videos.rds")
+
+videos_info <- videos %>%
+  select(video_id, title, description, publishedAt, channelTitle, channelId)
+
+# Visualizar as primeiras linhas
+head(videos_info) %>%
+  knitr::kable(caption = "Informações Básicas dos Vídeos")
+```
+
+#### **2.2. Análise das Datas de Publicação**
+
+Vamos analisar a distribuição das datas de publicação dos vídeos para entender quando houve um maior interesse ou produção de conteúdo sobre "educação online".
+
+```{r analyze-dates}
+# Converter a data de publicação para o formato Date
+videos_info <- videos_info %>%
+  mutate(publishedAt = as.Date(publishedAt))
+
+# Contar o número de vídeos por ano
+videos_per_year <- videos_info %>%
+  mutate(year = lubridate::year(publishedAt)) %>%
+  count(year)
+
+# Visualizar a distribuição de vídeos por ano
+ggplot(videos_per_year, aes(x = year, y = n)) +
+  geom_col(fill = "#1f78b4") +
+  labs(title = "Número de Vídeos sobre Educação Online por Ano",
+       x = "Ano",
+       y = "Quantidade de Vídeos") +
+  theme_minimal()
+```
+
+**Explicação:**
+
+-   Utilizamos `mutate()` para extrair o ano da data de publicação.
+-   Contamos quantos vídeos foram publicados em cada ano.
+-   Criamos um gráfico de barras para visualizar a distribuição.
+
+#### **2.3. Análise dos Canais**
+
+Vamos identificar os canais que mais publicam sobre "educação online" e analisar sua participação.
+
+```{r analyze-channels}
+# Contar o número de vídeos por canal
+videos_per_channel <- videos_info %>%
+  count(channelTitle, sort = TRUE)
+
+# Visualizar os principais canais
+videos_per_channel %>%
+  head(10) %>%
+  knitr::kable(caption = "Canais com Mais Vídeos sobre Educação Online")
+```
+
+**Explicação:**
+
+-   Contamos quantos vídeos cada canal publicou nos resultados da pesquisa.
+-   Ordenamos em ordem decrescente para identificar os canais mais ativos.
+
+#### **2.4. Análise de Texto dos Títulos e Descrições**
+
+Podemos realizar uma análise de texto dos títulos e descrições dos vídeos para identificar os termos mais frequentes e entender os temas abordados.
+
+##### **2.4.1. Processamento dos Títulos**
+
+```{r text-analysis-titles}
+# Tokenizar os títulos
+titles_words <- videos_info %>%
+  unnest_tokens(word, title)
+
+# Remover stop words em português
+stop_words_pt <- get_stopwords(language = "pt")
+titles_words <- titles_words %>%
+  anti_join(stop_words_pt, by = "word")
+
+# Contar a frequência das palavras
+word_counts_titles <- titles_words %>%
+  count(word, sort = TRUE)
+
+# Visualizar as palavras mais frequentes
+word_counts_titles %>%
+  head(10) %>%
+  knitr::kable(caption = "Palavras Mais Frequentes nos Títulos")
+```
+
+##### **2.4.2. Processamento das Descrições**
+
+```{r text-analysis-descriptions}
+# Tokenizar as descrições
+descriptions_words <- videos_info %>%
+  unnest_tokens(word, description)
+
+# Remover stop words em português
+descriptions_words <- descriptions_words %>%
+  anti_join(stop_words_pt, by = "word")
+
+# Contar a frequência das palavras
+word_counts_descriptions <- descriptions_words %>%
+  count(word, sort = TRUE)
+
+# Visualizar as palavras mais frequentes
+word_counts_descriptions %>%
+  head(10) %>%
+  knitr::kable(caption = "Palavras Mais Frequentes nas Descrições")
+```
+
+**Explicação:**
+
+-   Utilizamos `unnest_tokens()` para quebrar o texto em palavras individuais.
+-   Removemos as stop words para focar nas palavras significativas.
+-   Contamos a frequência de cada palavra para identificar as mais comuns.
+
+##### **2.4.3. Visualização com Nuvem de Palavras**
+
+Vamos criar nuvens de palavras para visualizar de forma impactante os termos mais frequentes nos títulos e descrições.
+
+```{r wordcloud-titles, fig.width=8, fig.height=6}
+# Nuvem de palavras dos títulos
+wordcloud2(word_counts_titles, size = 1, color = "random-light", backgroundColor = "grey")
+```
+
+```{r wordcloud-descriptions, fig.width=8, fig.height=6}
+# Nuvem de palavras das descrições
+wordcloud2(word_counts_descriptions, size = 1, color = "random-light", backgroundColor = "grey")
+```
+
+#### **2.5. Análise Temporal dos Vídeos**
+
+Além de analisar a quantidade de vídeos por ano, podemos aprofundar a análise temporal verificando a distribuição por mês ou identificando tendências.
+
+```{r temporal-analysis}
+# Contar o número de vídeos por mês e ano
+videos_per_month <- videos_info %>%
+  mutate(month = lubridate::floor_date(publishedAt, "month")) %>%
+  count(month)
+
+# Visualizar a tendência ao longo do tempo
+ggplot(videos_per_month, aes(x = month, y = n)) +
+  geom_line(color = "#e31a1c", size = 1) +
+  labs(title = "Tendência de Publicações sobre Educação Online",
+       x = "Data",
+       y = "Quantidade de Vídeos") +
+  theme_minimal()
+```
+
+**Explicação:**
+
+-   Utilizamos `floor_date()` para agrupar as datas por mês.
+-   Criamos um gráfico de linha para visualizar a tendência temporal.
+
+#### **2.6. Identificação de Temas Relevantes**
+
+Podemos realizar uma análise de bigramas para identificar termos compostos frequentes nos títulos ou descrições.
+
+```{r bigram-analysis}
+# Criar bigramas dos títulos
+titles_bigrams <- videos_info %>%
+  unnest_tokens(bigram, title, token = "ngrams", n = 2)
+
+# Remover stop words
+titles_bigrams <- titles_bigrams %>%
+  separate(bigram, c("word1", "word2"), sep = " ") %>%
+  filter(!word1 %in% stop_words_pt$word) %>%
+  filter(!word2 %in% stop_words_pt$word) %>%
+  unite(bigram, word1, word2, sep = " ")
+
+# Contar a frequência dos bigramas
+bigram_counts <- titles_bigrams %>%
+  count(bigram, sort = TRUE)
+
+# Visualizar os bigramas mais frequentes
+bigram_counts %>%
+  head(10) %>%
+  knitr::kable(caption = "Bigramas Mais Frequentes nos Títulos")
+```
+
+**Explicação:**
+
+-   Quebramos os títulos em bigramas (sequências de duas palavras).
+-   Removemos bigramas que contêm stop words.
+-   Contamos a frequência dos bigramas para identificar temas relevantes.
+
+------------------------------------------------------------------------
+
+### **Observações Importantes**
+
+Como estamos focando em dados disponíveis diretamente a partir dos resultados da pesquisa, algumas seções podem ser ajustadas ou expandidas:
+
+-   **Análise de Sentimento dos Títulos e Descrições**: Embora não tenhamos acesso a estatísticas dos vídeos, podemos realizar análises de sentimento nos textos disponíveis.
+
+-   **Exploração dos Canais**: Podemos aprofundar a análise dos canais identificados, por exemplo, verificando a frequência de publicação ou temas abordados.
+
+-   **Discussão sobre as Limitações**: É importante ressaltar as limitações encontradas devido às restrições da API e como isso impacta a análise.
+
+------------------------------------------------------------------------
+
+## **Um exemplo introdutório de análise de dados do YouTube**
+
+-   **Análise de Sentimento dos Títulos e Descrições**
+
+    Podemos utilizar léxicos de sentimento em português para analisar o sentimento predominante nos títulos e descrições dos vídeos.
+
+### **5. Análise de Sentimento dos Títulos**
+
+Embora limitada, podemos realizar uma análise de sentimento básica dos títulos.
+
+```{r sentiment-analysis, eval=FALSE, include=FALSE}
+# Carregar o léxico de sentimentos em português
+# Utilizando o lexicon 'oplexicon'
+if (!require("devtools")) install.packages("devtools")
+if (!require("oplexiconR")) devtools::install_github("pfreiref/oplexiconR")
+library(oplexiconR)
+
+# Juntar as palavras com o léxico
+titles_sentiment <- titles_words %>%
+  inner_join(oplexicon_v3.0, by = c("word" = "term"))
+
+# Contar sentimentos
+sentiment_counts <- titles_sentiment %>%
+  count(polarity)
+
+# Visualizar os resultados
+ggplot(sentiment_counts, aes(x = polarity, y = n, fill = polarity)) +
+  geom_col(show.legend = FALSE) +
+  scale_fill_manual(values = c(negative = "#e31a1c", neutral = "#b2df8a", positive = "#1f78b4")) +
+  labs(title = "Análise de Sentimento dos Títulos",
+       x = "Sentimento",
+       y = "Frequência") +
+  theme_minimal()
+```
+
+-   **Exploração dos Canais**
+
+    Podemos analisar os canais em mais detalhes, como:
+
+    -   Frequência de publicação.
+    -   Temas recorrentes.
+    -   Impacto na comunidade.
+
+
+------------------------------------------------------------------------
+
+## **Conclusão**
+
+Hoje, adaptamos nossa estratégia para explorar os dados disponíveis da API do YouTube.
+Focamos em informações acessíveis diretamente dos resultados de pesquisa, como títulos, descrições, datas de publicação e informações sobre os canais.
+
